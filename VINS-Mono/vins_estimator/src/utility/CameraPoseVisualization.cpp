@@ -9,6 +9,7 @@ const Eigen::Vector3d CameraPoseVisualization::lt1 = Eigen::Vector3d(-0.7, -0.2,
 const Eigen::Vector3d CameraPoseVisualization::lt2 = Eigen::Vector3d(-1.0, -0.2, 1.0);
 const Eigen::Vector3d CameraPoseVisualization::oc = Eigen::Vector3d(0.0, 0.0, 0.0);
 
+// 将 Eigen 的 3D 向量转换为 geometry_msgs::Point 类型
 void Eigen2Point(const Eigen::Vector3d& v, geometry_msgs::Point& p) {
     p.x = v.x();
     p.y = v.y();
@@ -125,6 +126,8 @@ void CameraPoseVisualization::add_pose(const Eigen::Vector3d& p, const Eigen::Qu
     Eigen2Point(q * (m_scale *lt2 ) + p, pt_lt2);
     Eigen2Point(q * (m_scale *oc  ) + p, pt_oc);
 
+
+    // 这些均是点，后面会两两连接成线段
     // image boundaries
     marker.points.push_back(pt_lt);
     marker.points.push_back(pt_lb);

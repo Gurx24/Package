@@ -42,6 +42,7 @@ void registerPub(ros::NodeHandle &n)
     keyframebasevisual.setLineWidth(0.01);
 }
 
+// 发布最新的里程计信息（高频IMU预积分结果）
 void pubLatestOdometry(const Eigen::Vector3d &P, const Eigen::Quaterniond &Q, const Eigen::Vector3d &V, const std_msgs::Header &header)
 {
     Eigen::Quaterniond quadrotor_Q = Q ;
@@ -62,6 +63,7 @@ void pubLatestOdometry(const Eigen::Vector3d &P, const Eigen::Quaterniond &Q, co
     pub_latest_odometry.publish(odometry);
 }
 
+// 打印估计结果的统计信息
 void printStatistics(const Estimator &estimator, double t)
 {
     if (estimator.solver_flag != Estimator::SolverFlag::NON_LINEAR)
@@ -103,6 +105,7 @@ void printStatistics(const Estimator &estimator, double t)
         ROS_INFO("td %f", estimator.td);
 }
 
+// 发布里程计和路径信息以及重定位路径
 void pubOdometry(const Estimator &estimator, const std_msgs::Header &header)
 {
     if (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR)
@@ -173,6 +176,7 @@ void pubOdometry(const Estimator &estimator, const std_msgs::Header &header)
     }
 }
 
+// 发布关键帧位姿信息
 void pubKeyPoses(const Estimator &estimator, const std_msgs::Header &header)
 {
     if (estimator.key_poses.size() == 0)
@@ -207,6 +211,8 @@ void pubKeyPoses(const Estimator &estimator, const std_msgs::Header &header)
     pub_key_poses.publish(key_poses);
 }
 
+
+// 发布相机位姿
 void pubCameraPose(const Estimator &estimator, const std_msgs::Header &header)
 {
     int idx2 = WINDOW_SIZE - 1;
@@ -237,6 +243,7 @@ void pubCameraPose(const Estimator &estimator, const std_msgs::Header &header)
 }
 
 
+// 发布点云(包括当前点和边缘化点)
 void pubPointCloud(const Estimator &estimator, const std_msgs::Header &header)
 {
     sensor_msgs::PointCloud point_cloud, loop_point_cloud;
@@ -296,6 +303,7 @@ void pubPointCloud(const Estimator &estimator, const std_msgs::Header &header)
 }
 
 
+// 发布TF变换
 void pubTF(const Estimator &estimator, const std_msgs::Header &header)
 {
     if( estimator.solver_flag != Estimator::SolverFlag::NON_LINEAR)
@@ -345,6 +353,8 @@ void pubTF(const Estimator &estimator, const std_msgs::Header &header)
 
 }
 
+
+// 发布关键帧位姿信息和点云
 void pubKeyframe(const Estimator &estimator)
 {
     // pub camera pose, 2D-3D points of keyframe
@@ -403,6 +413,8 @@ void pubKeyframe(const Estimator &estimator)
     }
 }
 
+
+// 发布重定位结果
 void pubRelocalization(const Estimator &estimator)
 {
     nav_msgs::Odometry odometry;

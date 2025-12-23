@@ -22,6 +22,13 @@ queue<sensor_msgs::PointCloudConstPtr> feature_buf;
 queue<sensor_msgs::PointCloudConstPtr> relo_buf;
 int sum_of_wait = 0;
 
+/**
+ * 互斥锁（Mutual Exclusion）
+ * C++11 标准库中提供的用于多线程同步的核心工具
+ * std::mutex 的存在是为了防止它们同时去改写同一块内存，从而导致程序崩溃或数据混乱
+ * 它只有两种状态：锁定（Locked）和 解锁（Unlocked）
+ */
+
 std::mutex m_buf;
 std::mutex m_state;
 std::mutex i_buf;
@@ -144,6 +151,7 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu_msg)
     }
     last_imu_t = imu_msg->header.stamp.toSec();
 
+    // 
     m_buf.lock();
     imu_buf.push(imu_msg);
     m_buf.unlock();
@@ -352,6 +360,7 @@ int main(int argc, char **argv)
 
     registerPub(n);
 
+    // 订阅IMU话题，开启tcpNoDelay后，数据会立刻发送，从而保证IMU数据以最低延迟到达后端，提高系统的实时性
     ros::Subscriber sub_imu = n.subscribe(IMU_TOPIC, 2000, imu_callback, ros::TransportHints().tcpNoDelay());
     ros::Subscriber sub_image = n.subscribe("/feature_tracker/feature", 2000, feature_callback);
     ros::Subscriber sub_restart = n.subscribe("/feature_tracker/restart", 2000, restart_callback);

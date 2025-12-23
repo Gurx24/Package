@@ -1,10 +1,26 @@
 #include "feature_manager.h"
 
+
+/**
+ * 该程序负责管理滑动窗口内所有视觉特征点的数据结构、生命周期以及空间位置估计
+ * 
+ * 负责记录：
+ * 1、哪个点在哪些帧里被看到
+ * 2、这些点离相机有多远
+ * 3、哪些帧应该作为关键帧
+ */
+
+
+
+ /**
+  * 基础信息查询与状态管理 
+  */
 int FeaturePerId::endFrame()
 {
     return start_frame + feature_per_frame.size() - 1;
 }
 
+// 初始化旋转矩阵
 FeatureManager::FeatureManager(Matrix3d _Rs[])
     : Rs(_Rs)
 {
@@ -12,6 +28,7 @@ FeatureManager::FeatureManager(Matrix3d _Rs[])
         ric[i].setIdentity();
 }
 
+// 设置相机到IMU的旋转矩阵
 void FeatureManager::setRic(Matrix3d _ric[])
 {
     for (int i = 0; i < NUM_OF_CAM; i++)
@@ -20,17 +37,19 @@ void FeatureManager::setRic(Matrix3d _ric[])
     }
 }
 
+// 清除特征容器
 void FeatureManager::clearState()
 {
     feature.clear();
 }
 
+// 滑动窗口中有效特征点的数量
 int FeatureManager::getFeatureCount()
 {
     int cnt = 0;
     for (auto &it : feature)
     {
-
+        // 计算每个特征点在窗口中被观测到的次数
         it.used_num = it.feature_per_frame.size();
 
         if (it.used_num >= 2 && it.start_frame < WINDOW_SIZE - 2)
@@ -41,7 +60,9 @@ int FeatureManager::getFeatureCount()
     return cnt;
 }
 
-
+/**
+ * 把新帧的特征点加入管理，并根据视差决定该帧是否为关键帧
+ */
 bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, double td)
 {
     ROS_DEBUG("input feature: %d", (int)image.size());
@@ -117,6 +138,10 @@ void FeatureManager::debugShow()
     }
 }
 
+/**
+ * 获取两个帧之间的特征点对应关系
+ * 获得特征点对
+ */
 vector<pair<Vector3d, Vector3d>> FeatureManager::getCorresponding(int frame_count_l, int frame_count_r)
 {
     vector<pair<Vector3d, Vector3d>> corres;
@@ -199,6 +224,10 @@ VectorXd FeatureManager::getDepthVector()
     return dep_vec;
 }
 
+
+/**
+ * 三角化计算特征点深度
+ */
 void FeatureManager::triangulate(Vector3d Ps[], Vector3d tic[], Matrix3d ric[])
 {
     for (auto &it_per_id : feature)
@@ -256,6 +285,7 @@ void FeatureManager::triangulate(Vector3d Ps[], Vector3d tic[], Matrix3d ric[])
     }
 }
 
+// 剔除异常值特征点
 void FeatureManager::removeOutlier()
 {
     ROS_BREAK();
@@ -272,6 +302,12 @@ void FeatureManager::removeOutlier()
     }
 }
 
+
+/**
+ * 窗口滑动维护（边缘化相关）
+ * 当滑动窗口更新时，旧的图像帧会被移出。
+ * 为了保证数据一致性，需要对特征点索引进行平移
+ */
 void FeatureManager::removeBackShiftDepth(Eigen::Matrix3d marg_R, Eigen::Vector3d marg_P, Eigen::Matrix3d new_R, Eigen::Vector3d new_P)
 {
     for (auto it = feature.begin(), it_next = feature.begin();
@@ -352,10 +388,13 @@ void FeatureManager::removeFront(int frame_count)
     }
 }
 
+/**
+ * 计算两个连续帧之间特征点的物理视差
+ */
 double FeatureManager::compensatedParallax2(const FeaturePerId &it_per_id, int frame_count)
 {
     //check the second last frame is keyframe or not
-    //parallax betwwen seconde last frame and third last frame
+    //parallax between second last frame and third last frame
     const FeaturePerFrame &frame_i = it_per_id.feature_per_frame[frame_count - 2 - it_per_id.start_frame];
     const FeaturePerFrame &frame_j = it_per_id.feature_per_frame[frame_count - 1 - it_per_id.start_frame];
 

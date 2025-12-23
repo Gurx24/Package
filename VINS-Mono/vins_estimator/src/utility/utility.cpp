@@ -1,5 +1,6 @@
 #include "utility.h"
 
+// 重力向量到世界坐标系旋转矩阵，并调整偏航角旋转回原方向
 Eigen::Matrix3d Utility::g2R(const Eigen::Vector3d &g)
 {
     Eigen::Matrix3d R0;

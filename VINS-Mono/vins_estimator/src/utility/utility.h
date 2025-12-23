@@ -12,6 +12,7 @@
 class Utility
 {
   public:
+    // 角度增量转四元数增量
     template <typename Derived>
     static Eigen::Quaternion<typename Derived::Scalar> deltaQ(const Eigen::MatrixBase<Derived> &theta)
     {
@@ -27,6 +28,7 @@ class Utility
         return dq;
     }
 
+    // 将向量转换为反对称矩阵，q(3)表示实部
     template <typename Derived>
     static Eigen::Matrix<typename Derived::Scalar, 3, 3> skewSymmetric(const Eigen::MatrixBase<Derived> &q)
     {
@@ -37,6 +39,7 @@ class Utility
         return ans;
     }
 
+    // 本来功能是确保四元数的实部为正，后改为直接返回，为了让优化过程尽可能“平滑”，在算法开发中，这种做法被称为“保持流形的连续性”
     template <typename Derived>
     static Eigen::Quaternion<typename Derived::Scalar> positify(const Eigen::QuaternionBase<Derived> &q)
     {
@@ -47,6 +50,7 @@ class Utility
         return q;
     }
 
+    // 将左四元数转化为矩阵形式，便于后续四元数乘法计算
     template <typename Derived>
     static Eigen::Matrix<typename Derived::Scalar, 4, 4> Qleft(const Eigen::QuaternionBase<Derived> &q)
     {
@@ -57,6 +61,7 @@ class Utility
         return ans;
     }
 
+    // 将右四元数转化为矩阵形式，便于后续四元数乘法计算
     template <typename Derived>
     static Eigen::Matrix<typename Derived::Scalar, 4, 4> Qright(const Eigen::QuaternionBase<Derived> &p)
     {
@@ -67,6 +72,7 @@ class Utility
         return ans;
     }
 
+    // 旋转矩阵到偏航角、俯仰角、横滚角（单位：度）
     static Eigen::Vector3d R2ypr(const Eigen::Matrix3d &R)
     {
         Eigen::Vector3d n = R.col(0);
@@ -84,6 +90,7 @@ class Utility
         return ypr / M_PI * 180.0;
     }
 
+    // 偏航角、俯仰角、横滚角（单位：度）到旋转矩阵
     template <typename Derived>
     static Eigen::Matrix<typename Derived::Scalar, 3, 3> ypr2R(const Eigen::MatrixBase<Derived> &ypr)
     {
@@ -111,8 +118,11 @@ class Utility
         return Rz * Ry * Rx;
     }
 
+    // 重力向量转化为旋转矩阵
     static Eigen::Matrix3d g2R(const Eigen::Vector3d &g);
 
+
+    // 编译期循环展开辅助结构体和函数
     template <size_t N>
     struct uint_
     {
@@ -131,6 +141,8 @@ class Utility
         f(iter);
     }
 
+
+    // 归一化角度到[-180,180]度范围内
     template <typename T>
     static T normalizeAngle(const T& angle_degrees) {
       T two_pi(2.0 * 180);

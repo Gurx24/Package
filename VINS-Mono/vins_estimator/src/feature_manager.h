@@ -15,6 +15,10 @@ using namespace Eigen;
 
 #include "parameters.h"
 
+/**
+ * 存储了特征点在某一个图像帧中的所有观测信息
+ * 表示某一帧的观测
+ */
 class FeaturePerFrame
 {
   public:
@@ -41,12 +45,15 @@ class FeaturePerFrame
     double dep_gradient;
 };
 
+/**
+ * 负责管理同一个 ID 的特征点在所有观测帧中的集合
+ */
 class FeaturePerId
 {
   public:
     const int feature_id;
     int start_frame;
-    vector<FeaturePerFrame> feature_per_frame;
+    vector<FeaturePerFrame> feature_per_frame;    // 容器中的每一个元素对应一个FeaturePerFrame对象
 
     int used_num;
     bool is_outlier;
@@ -65,6 +72,11 @@ class FeaturePerId
     int endFrame();
 };
 
+
+/**
+ * 最高级别的管理类，负责维护滑动窗口内所有活跃特征点的列表
+ * 将所有地图点统一管理，处理“点的新增、剔除、深度估计和滑动窗口更新”
+ */
 class FeatureManager
 {
   public:

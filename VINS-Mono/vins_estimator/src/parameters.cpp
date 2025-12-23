@@ -1,5 +1,8 @@
 #include "parameters.h"
 
+/**
+ * 该文件中的代码用于读取和存储VINS-Mono系统的参数配置。
+ */
 double INIT_DEPTH;
 double MIN_PARALLAX;
 double ACC_N, ACC_W;
