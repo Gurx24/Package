@@ -2,6 +2,7 @@
 
 GlobalSFM::GlobalSFM(){}
 
+// 已知位姿和特征点对，三角化得到特征点的3D位置
 void GlobalSFM::triangulatePoint(Eigen::Matrix<double, 3, 4> &Pose0, Eigen::Matrix<double, 3, 4> &Pose1,
 						Vector2d &point0, Vector2d &point1, Vector3d &point_3d)
 {
@@ -18,7 +19,7 @@ void GlobalSFM::triangulatePoint(Eigen::Matrix<double, 3, 4> &Pose0, Eigen::Matr
 	point_3d(2) = triangulated_point(2) / triangulated_point(3);
 }
 
-
+// 通过PnP来估计第i帧的位姿
 bool GlobalSFM::solveFrameByPnP(Matrix3d &R_initial, Vector3d &P_initial, int i,
 								vector<SFMFeature> &sfm_f)
 {
@@ -71,6 +72,7 @@ bool GlobalSFM::solveFrameByPnP(Matrix3d &R_initial, Vector3d &P_initial, int i,
 
 }
 
+// 三角化两帧之间所有共视特征点
 void GlobalSFM::triangulateTwoFrames(int frame0, Eigen::Matrix<double, 3, 4> &Pose0, 
 									 int frame1, Eigen::Matrix<double, 3, 4> &Pose1,
 									 vector<SFMFeature> &sfm_f)
@@ -114,6 +116,7 @@ void GlobalSFM::triangulateTwoFrames(int frame0, Eigen::Matrix<double, 3, 4> &Po
 //  c_translation cam_R_w
 // relative_q[i][j]  j_q_i
 // relative_t[i][j]  j_t_ji  (j < i)
+// 初始化运动恢复的主函数
 bool GlobalSFM::construct(int frame_num, Quaterniond* q, Vector3d* T, int l,
 			  const Matrix3d relative_R, const Vector3d relative_T,
 			  vector<SFMFeature> &sfm_f, map<int, Vector3d> &sfm_tracked_points)
@@ -122,23 +125,26 @@ bool GlobalSFM::construct(int frame_num, Quaterniond* q, Vector3d* T, int l,
 	//cout << "set 0 and " << l << " as known " << endl;
 	// have relative_r relative_t
 	// intial two view
+	// 将第 l 帧设为初始帧(世界帧)，四元数设为单位四元数，位置向量设为零向量
 	q[l].w() = 1;
 	q[l].x() = 0;
 	q[l].y() = 0;
 	q[l].z() = 0;
 	T[l].setZero();
+	// 根据相对位姿计算第 frame_num - 1 帧的四元数和位置向量
 	q[frame_num - 1] = q[l] * Quaterniond(relative_R);
 	T[frame_num - 1] = relative_T;
 	//cout << "init q_l " << q[l].w() << " " << q[l].vec().transpose() << endl;
 	//cout << "init t_l " << T[l].transpose() << endl;
 
 	//rotate to cam frame
-	Matrix3d c_Rotation[frame_num];
-	Vector3d c_Translation[frame_num];
-	Quaterniond c_Quat[frame_num];
-	double c_rotation[frame_num][4];
+	Matrix3d c_Rotation[frame_num];					// 世界系(参考系)到相机系的旋转矩阵
+	Vector3d c_Translation[frame_num];				// 世界系到相机系的平移向量
+	Quaterniond c_Quat[frame_num];					// 世界系到相机系的四元数
+	// ceres优化专用变量
+	double c_rotation[frame_num][4];				// Ceres不认 Eigen 的向量或矩阵对象，只认最底层的 double* 指针
 	double c_translation[frame_num][3];
-	Eigen::Matrix<double, 3, 4> Pose[frame_num];
+	Eigen::Matrix<double, 3, 4> Pose[frame_num];	// 世界系到相机系的位姿矩阵表示
 
 	c_Quat[l] = q[l].inverse();
 	c_Rotation[l] = c_Quat[l].toRotationMatrix();
@@ -229,7 +235,9 @@ bool GlobalSFM::construct(int frame_num, Quaterniond* q, Vector3d* T, int l,
 		cout << "solvePnP  t" << " i " << i <<"  " << t_tmp.x() <<"  "<< t_tmp.y() <<"  "<< t_tmp.z() << endl;
 	}
 */
+
 	//full BA
+	// 光束法平差优化
 	ceres::Problem problem;
 	ceres::LocalParameterization* local_parameterization = new ceres::QuaternionParameterization();
 	//cout << " begin full BA " << endl;
@@ -245,10 +253,13 @@ bool GlobalSFM::construct(int frame_num, Quaterniond* q, Vector3d* T, int l,
 		c_rotation[i][3] = c_Quat[i].z();
 		problem.AddParameterBlock(c_rotation[i], 4, local_parameterization);
 		problem.AddParameterBlock(c_translation[i], 3);
+		// BA的约束条件
+		// 固定原点：第 l 帧不能动，否则整个世界会飘走
 		if (i == l)
 		{
 			problem.SetParameterBlockConstant(c_rotation[i]);
 		}
+		// 固定尺度：这是最关键的！如果不固定第 l 帧和最后一帧之间的距离（relative_T），优化器可能会把所有点缩小到无穷小或放大到无穷大来“作弊”减小误差
 		if (i == l || i == frame_num - 1)
 		{
 			problem.SetParameterBlockConstant(c_translation[i]);

@@ -15,6 +15,8 @@
  /**
   * 基础信息查询与状态管理 
   */
+
+// 计算某个特征点在滑动窗口中最后一次被观测到的帧索引
 int FeaturePerId::endFrame()
 {
     return start_frame + feature_per_frame.size() - 1;
@@ -70,6 +72,15 @@ bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vec
     double parallax_sum = 0;
     int parallax_num = 0;
     last_track_num = 0;
+
+    /**
+     * 更新特征点档案
+     * 提取观测：为每个特征点创建一个 FeaturePerFrame 对象（包含位置、速度等）。
+     * 匹配/新建：
+     * 如果这个 feature_id 是第一次见到，就在 feature 容器（档案库）里新建一条记录。
+     * 如果这个点之前见过（已存在于档案库），就把它在这一帧的新观测信息补在后面。
+     * 计数：统计有多少个点是上一帧也看到的（last_track_num），这代表了追踪的质量。
+     */
     for (auto &id_pts : image)
     {
         FeaturePerFrame f_per_fra(id_pts.second[0].second, td);
@@ -92,6 +103,9 @@ bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vec
         }
     }
 
+    /**
+     * 计算视差以决定关键帧
+     */
     if (frame_count < 2 || last_track_num < 20)
         return true;
 
@@ -146,18 +160,19 @@ vector<pair<Vector3d, Vector3d>> FeatureManager::getCorresponding(int frame_coun
 {
     vector<pair<Vector3d, Vector3d>> corres;
     for (auto &it : feature)
-    {
+    {   
+        // 共视点的判断条件：某个特征点在 frame_count_l 和 frame_count_r 两帧之间均有观测
         if (it.start_frame <= frame_count_l && it.endFrame() >= frame_count_r)
         {
             Vector3d a = Vector3d::Zero(), b = Vector3d::Zero();
             int idx_l = frame_count_l - it.start_frame;
             int idx_r = frame_count_r - it.start_frame;
 
-            a = it.feature_per_frame[idx_l].point;
+            a = it.feature_per_frame[idx_l].point;      // 得到左右两帧存储的共视点在两帧中的归一化坐标
 
             b = it.feature_per_frame[idx_r].point;
             
-            corres.push_back(make_pair(a, b));
+            corres.push_back(make_pair(a, b));          // 返回共视点对
         }
     }
     return corres;
@@ -183,6 +198,7 @@ void FeatureManager::setDepth(const VectorXd &x)
     }
 }
 
+// 从特征点管理器中彻底删除那些三角化失败或者优化失败的特征点，防止它们污染后续的计算
 void FeatureManager::removeFailures()
 {
     for (auto it = feature.begin(), it_next = feature.begin();

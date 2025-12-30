@@ -10,6 +10,7 @@ using namespace Eigen;
 
 #include <ros/console.h>
 
+// 五点法运动估计器
 class MotionEstimator
 {
   public:

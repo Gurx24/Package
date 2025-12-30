@@ -16,8 +16,8 @@ using namespace std;
 struct SFMFeature
 {
     bool state;
-    int id;
-    vector<pair<int,Vector2d>> observation;
+    int id;										// 特征点ID
+    vector<pair<int,Vector2d>> observation;		// 每个特征点在窗口中的观测(哪个帧能看到该特征点，该特征点的归一化坐标)
     double position[3];
     double depth;
 };

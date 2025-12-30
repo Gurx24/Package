@@ -6,6 +6,7 @@
 #include <ceres/ceres.h>
 using namespace Eigen;
 
+// IMU预积分类
 class IntegrationBase
 {
   public:
@@ -27,6 +28,7 @@ class IntegrationBase
         noise.block<3, 3>(15, 15) =  (GYR_W * GYR_W) * Eigen::Matrix3d::Identity();
     }
 
+    // 将每一帧 IMU 测量数据加入到预积分中
     void push_back(double dt, const Eigen::Vector3d &acc, const Eigen::Vector3d &gyr)
     {
         dt_buf.push_back(dt);

@@ -53,12 +53,12 @@ class FeaturePerId
   public:
     const int feature_id;
     int start_frame;
-    vector<FeaturePerFrame> feature_per_frame;    // 容器中的每一个元素对应一个FeaturePerFrame对象
+    vector<FeaturePerFrame> feature_per_frame;    // 表示某一特征点在多帧图像中的观测
 
     int used_num;
     bool is_outlier;
     bool is_margin;
-    double estimated_depth;
+    double estimated_depth;       // 估计的深度值
     int solve_flag; // 0 haven't solve yet; 1 solve succ; 2 solve fail;
 
     Vector3d gt_p;
@@ -75,7 +75,7 @@ class FeaturePerId
 
 /**
  * 最高级别的管理类，负责维护滑动窗口内所有活跃特征点的列表
- * 将所有地图点统一管理，处理“点的新增、剔除、深度估计和滑动窗口更新”
+ * 将滑动窗口内所有地图点统一管理，处理“点的新增、剔除、深度估计和滑动窗口更新”
  */
 class FeatureManager
 {
@@ -102,6 +102,11 @@ class FeatureManager
     void removeBack();
     void removeFront(int frame_count);
     void removeOutlier();
+
+    /**
+     * 第一层 (std::list<FeaturePerId>)：档案柜里的每一个抽屉。每个抽屉代表空间中一个唯一的三维点（通过 feature_id 区分）。
+     * 第二层 (std::vector<FeaturePerFrame>)：每个抽屉里的一叠照片。每张照片代表这个点在某一个特定视频帧里的观测信息（坐标、速度等）。
+     */
     list<FeaturePerId> feature;
     int last_track_num;
 

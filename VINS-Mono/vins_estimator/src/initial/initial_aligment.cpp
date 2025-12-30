@@ -1,5 +1,6 @@
 #include "initial_alignment.h"
 
+// 优化陀螺仪偏置
 void solveGyroscopeBias(map<double, ImageFrame> &all_image_frame, Vector3d* Bgs)
 {
     Matrix3d A;
@@ -17,8 +18,9 @@ void solveGyroscopeBias(map<double, ImageFrame> &all_image_frame, Vector3d* Bgs)
         VectorXd tmp_b(3);
         tmp_b.setZero();
         Eigen::Quaterniond q_ij(frame_i->second.R.transpose() * frame_j->second.R);
-        tmp_A = frame_j->second.pre_integration->jacobian.template block<3, 3>(O_R, O_BG);
+        tmp_A = frame_j->second.pre_integration->jacobian.template block<3, 3>(O_R, O_BG);  // block为矩阵切片函数，从O_R行，O_BG列开始，取3行3列
         tmp_b = 2 * (frame_j->second.pre_integration->delta_q.inverse() * q_ij).vec();
+        // 求解最小二乘问题等价于求解正规方程的过程：A^T*A*delta_bg = A^T*b
         A += tmp_A.transpose() * tmp_A;
         b += tmp_A.transpose() * tmp_b;
 
@@ -40,20 +42,23 @@ void solveGyroscopeBias(map<double, ImageFrame> &all_image_frame, Vector3d* Bgs)
 MatrixXd TangentBasis(Vector3d &g0)
 {
     Vector3d b, c;
-    Vector3d a = g0.normalized();
+    Vector3d a = g0.normalized();   // 重力方向
     Vector3d tmp(0, 0, 1);
     if(a == tmp)
         tmp << 1, 0, 0;
-    b = (tmp - a * (a.transpose() * tmp)).normalized();
-    c = a.cross(b);
+    b = (tmp - a * (a.transpose() * tmp)).normalized(); // 史密特正交化
+    c = a.cross(b);     // 叉积
     MatrixXd bc(3, 2);
     bc.block<3, 1>(0, 0) = b;
     bc.block<3, 1>(0, 1) = c;
     return bc;
 }
 
+// 重力重新估计与优化
 void RefineGravity(map<double, ImageFrame> &all_image_frame, Vector3d &g, VectorXd &x)
 {
+    // norm为重力加速度的模长，normalized为单位化向量
+    // 重定义重力向量 g0, 方向与 g 相同，模长为 G 的模长
     Vector3d g0 = g.normalized() * G.norm();
     Vector3d lx, ly;
     //VectorXd x;
@@ -122,10 +127,12 @@ void RefineGravity(map<double, ImageFrame> &all_image_frame, Vector3d &g, Vector
     g = g0;
 }
 
+// 恢复尺度和重力方向的线性对齐
+// 优化出的重力向量 g 可能不满足模长为 9.8 的约束，后续需要加入约束并重新优化
 bool LinearAlignment(map<double, ImageFrame> &all_image_frame, Vector3d &g, VectorXd &x)
 {
     int all_frame_count = all_image_frame.size();
-    int n_state = all_frame_count * 3 + 3 + 1;
+    int n_state = all_frame_count * 3 + 3 + 1;          // 待估计变量的维度：每帧的速度（三个自由度）+ 重力（三个自由度）+ 尺度（一个自由度）
 
     MatrixXd A{n_state, n_state};
     A.setZero();
@@ -139,13 +146,14 @@ bool LinearAlignment(map<double, ImageFrame> &all_image_frame, Vector3d &g, Vect
     {
         frame_j = next(frame_i);
 
-        MatrixXd tmp_A(6, 10);
+        MatrixXd tmp_A(6, 10);      // 某相邻两帧的H矩阵
         tmp_A.setZero();
         VectorXd tmp_b(6);
         tmp_b.setZero();
 
         double dt = frame_j->second.pre_integration->sum_dt;
 
+        // 某连续两帧之间的H矩阵和b向量
         tmp_A.block<3, 3>(0, 0) = -dt * Matrix3d::Identity();
         tmp_A.block<3, 3>(0, 6) = frame_i->second.R.transpose() * dt * dt / 2 * Matrix3d::Identity();
         tmp_A.block<3, 1>(0, 9) = frame_i->second.R.transpose() * (frame_j->second.T - frame_i->second.T) / 100.0;     
@@ -165,6 +173,7 @@ bool LinearAlignment(map<double, ImageFrame> &all_image_frame, Vector3d &g, Vect
         MatrixXd r_A = tmp_A.transpose() * cov_inv * tmp_A;
         VectorXd r_b = tmp_A.transpose() * cov_inv * tmp_b;
 
+        // 将连续两帧之间的H矩阵和b向量映射到大的全状态量的H矩阵和b向量中
         A.block<6, 6>(i * 3, i * 3) += r_A.topLeftCorner<6, 6>();
         b.segment<6>(i * 3) += r_b.head<6>();
 
@@ -174,6 +183,7 @@ bool LinearAlignment(map<double, ImageFrame> &all_image_frame, Vector3d &g, Vect
         A.block<6, 4>(i * 3, n_state - 4) += r_A.topRightCorner<6, 4>();
         A.block<4, 6>(n_state - 4, i * 3) += r_A.bottomLeftCorner<4, 6>();
     }
+    // 工程手段：将矩阵A和向量b的值都放大1000倍，避免数值过小导致求解不稳定
     A = A * 1000.0;
     b = b * 1000.0;
     x = A.ldlt().solve(b);
@@ -196,6 +206,7 @@ bool LinearAlignment(map<double, ImageFrame> &all_image_frame, Vector3d &g, Vect
         return true;
 }
 
+// 视觉-IMU对齐 的总入口函数
 bool VisualIMUAlignment(map<double, ImageFrame> &all_image_frame, Vector3d* Bgs, Vector3d &g, VectorXd &x)
 {
     solveGyroscopeBias(all_image_frame, Bgs);
